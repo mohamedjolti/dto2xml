@@ -1,6 +1,6 @@
 <?php
 
-namespace Samples;
+namespace Samples\Dto;
 
 class Teacher
 {

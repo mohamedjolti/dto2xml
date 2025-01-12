@@ -1,6 +1,6 @@
 <?php
 
-namespace Samples;
+namespace Samples\Dto;
 
 class School
 {
@@ -12,14 +12,22 @@ class School
 
 
     /**
-     * @var Adresse $address
+     * @var Adresse $adresse
      */
-    private $address;
+    private $adresse;
 
     /**
      * @var Teacher[] $teachers
      */
     private $teachers;
+
+
+    /**
+     * @outputName school-rooms
+     * @inputName school-roomsH
+     * @var Room[] $rooms
+     */
+    private $rooms;
 
     public function getAttributes():array
     {
@@ -44,14 +52,14 @@ class School
         $this->name = $name;
     }
 
-    public function getAddress(): Adresse
+    public function getAdresse(): Adresse
     {
-        return $this->address;
+        return $this->adresse;
     }
 
-    public function setAddress(Adresse $address): void
+    public function setAdresse(Adresse $adresse): void
     {
-        $this->address = $address;
+        $this->adresse = $adresse;
     }
 
     public function getTeachers(): array
@@ -62,6 +70,16 @@ class School
     public function setTeachers(array $teachers): void
     {
         $this->teachers = $teachers;
+    }
+
+    public function getRooms(): array
+    {
+        return $this->rooms;
+    }
+
+    public function setRooms(array $rooms): void
+    {
+        $this->rooms = $rooms;
     }
 
 

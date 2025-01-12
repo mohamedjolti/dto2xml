@@ -5,11 +5,14 @@ namespace Dtotoxml\Tools;
 use Dtotoxml\Contracts\Serialiser;
 use Dtotoxml\Exception\BadArgumentException;
 use Dtotoxml\Exception\BadPropertyException;
+use Dtotoxml\Exception\NotFoundException;
+use Dtotoxml\Properties\ObjectProperties;
 use Dtotoxml\Properties\XmlProperties;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionProperty;
 use DOMDocument;
+use SimpleXMLElement;
 
 class XmlSerializer implements Serialiser
 {
@@ -20,7 +23,7 @@ class XmlSerializer implements Serialiser
      * @param $dto
      * @return string
      * @throws BadArgumentException
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function serialise($dto, $isParent = true)
     {
@@ -48,20 +51,17 @@ class XmlSerializer implements Serialiser
             $propertyValue = $dto->{$prepertyGetterMethod}();
 
             /** Check if the property is an attribute */
-            if($this->isPropertyAnAttributes($prepertyName, $dto)) {
-                $attributes .= $prepertyName . " ". XmlProperties::XML_CLOSING_EQAUL ."'" . $propertyValue . "' ". "\n";
-            }
-            /** Check if the annotation of the property is an array of objects */
+            if ($this->isPropertyAnAttribute($property, $dto)) {
+                $propertyTag = $this->getTagNameByAnnotationIfExist($property);
+                $attributes .= $propertyTag . " " . XmlProperties::XML_CLOSING_EQAUL . "'" . $propertyValue . "' " . "\n";
+            } /** Check if the annotation of the property is an array of objects */
             elseif ($this->isPropertyArrayType($reflection, $prepertyName) && is_array($propertyValue)) {
-                $xml .= $this->serializeArrayObject($propertyValue, $prepertyName);
-            }
-            /** Check if the annotation of the property is an Object */
+                $xml .= $this->serializeArrayObject($property, $propertyValue);
+            } /** Check if the annotation of the property is an Object */
             elseif ($this->isPropertyOfObjectType($reflection, $prepertyName) && is_object($propertyValue)) {
                 $xml .= $this->serialise($propertyValue, false);
-            }
-
-            else {
-                $propertyTag = $this->getTagFromString($prepertyName);
+            } else {
+                $propertyTag = $this->getTagNameByAnnotationIfExist($property);
                 $xml .= $this->getOpeningTag($propertyTag) . $propertyValue . $this->getClosingTag($propertyTag);
             }
         }
@@ -70,9 +70,98 @@ class XmlSerializer implements Serialiser
         return $header . $this->getOpeningTagWithAttributes($tag, $attributes) . $xml . $closingTag;
     }
 
-    public function unserialise($xml, $targetClass)
+    public function unserialise(string $xml, $targetClass)
     {
+        $xmlELement = new SimpleXMLElement($xml);
+        $array = $this->xmlToArray($xmlELement);
+        if (!class_exists($targetClass)) {
+            throw new NotFoundException("The target class '$targetClass' does not exist");
+        }
+        //dd($array);
+        $instance = $this->arrayToObject($array, $targetClass);
+        return $instance;
     }
+
+    private function xmlToArray(SimpleXMLElement $xml): array|string
+    {
+        $array = [];
+
+        // Include attributes
+        foreach ($xml->attributes() as $attrKey => $attrValue) {
+            $array[XmlProperties::XML_ATTRIBUTE_UNSERIALIZE_KEY_NAME][$attrKey] = (string)$attrValue;
+        }
+
+        // Process child elements
+        foreach ($xml->children() as $key => $value) {
+            $child = $this->xmlToArray($value);
+
+            // Handle multiple sibling elements with the same key
+            if (isset($array[$key])) {
+                if (!is_array($array[$key]) || !isset($array[$key][0])) {
+                    $array[$key] = [$array[$key]]; // Convert existing value to array
+                }
+                $array[$key][] = $child;
+            } else {
+                $array[$key] = $child;
+            }
+        }
+
+        // If no children and no attributes, return the node value as an array
+        if (empty($array)) {
+            return (string)$xml;
+        }
+
+        return $array;
+    }
+
+
+    private function arrayToObject($array, $targetClass)
+    {
+        $instance = new $targetClass();
+        foreach ($array as $key => $value) {
+
+            /** List of attributes */
+            if (XmlProperties::XML_ATTRIBUTE_UNSERIALIZE_KEY_NAME == $key) {
+                foreach ($value as $attribute => $attributeValue) {
+                    $attributePropertyName = $this->getClassNameByInputAttributeIfExist($attribute, $targetClass);
+                    $setterName = $this->getSetterNameByPropertyName($attributePropertyName);
+                    if (!$setterName) {
+                        throw new NotFoundException("The property '" . $attribute . "' does not exist or doesn't have a setter method");
+                    }
+                    $instance->$setterName($attributeValue);
+                }
+                continue;
+            }
+            $propertyName = $this->getClassNameByInputAttributeIfExist($key, $targetClass);
+            $setterName = $this->getSetterNameByPropertyName($propertyName);
+            /** If it is a sub type */
+            if (is_array($value)) {
+                $class = $this->getClassNameByPropertyName($propertyName, $targetClass);
+                if (!$class) {
+                    continue;
+                }
+                $className = $this->config->getNameSpaceOutput() . '\\' . $class;
+                /** If it is a sub type of type array */
+                if (str_contains($className, ObjectProperties::PROPERTY_TYPE_ARRAY)) {
+                    $className = str_replace(ObjectProperties::PROPERTY_TYPE_ARRAY, '', $className);
+                    $arrayObjects = [];
+                    $items = array_values($value)[0];
+                    foreach ($items as $item) {
+                        $object = $this->arrayToObject($item, $className);
+                        $arrayObjects[] = $object;
+                    }
+                    $instance->{$setterName}($arrayObjects);
+                } else {
+                    $object = $this->arrayToObject($value, $className);
+                    $instance->{$setterName}($object);
+                }
+            } else {
+                $instance->{$setterName}($value);
+            }
+        }
+        return $instance;
+    }
+
 
     public function getConfig(): Configuration
     {
@@ -83,7 +172,6 @@ class XmlSerializer implements Serialiser
     {
         $this->config = $config;
     }
-
 
 
     /**
@@ -121,20 +209,20 @@ class XmlSerializer implements Serialiser
     }
 
     /**
-     * @param string $string
+     * @param string $propertyName
      * @return mixed|string
      * @throws \ReflectionException
      */
-    public function getTagFromString($string)
+    public function getTagFromString($propertyName)
     {
-        return strtoupper($string);
+        return strtoupper($propertyName);
     }
 
     /**
      * @param ReflectionProperty $property
      * @return string
      */
-    public function getGetterMethodName($property)
+    public function getGetterMethodName(ReflectionProperty $property): string
     {
         $prertyName = "get" . ucfirst(strtolower($property->getName()));
         return $prertyName;
@@ -160,11 +248,11 @@ class XmlSerializer implements Serialiser
         $docComment = $property->getDocComment();
 
         // Check for the presence of the @var annotation
-        if (preg_match('/@var\s+([^\s]+)/', $docComment, $matches)) {
+        if (preg_match(ObjectProperties::PROPERTY_VAR_REGEX_NAME, $docComment, $matches)) {
             $type = $matches[1];
 
             // Check if the type is an object (not a scalar type like int, string, etc.)
-            if (!in_array(strtolower($type), ['int', 'float', 'string', 'bool', 'array', 'null'])) {
+            if (!in_array(strtolower($type), ObjectProperties::SCALAR_VALUES)) {
                 return true;
             }
         }
@@ -178,29 +266,30 @@ class XmlSerializer implements Serialiser
         $docComment = $property->getDocComment();
 
         // Check for the presence of the @var annotation with the [] array syntax
-        if (preg_match('/@var\s+([^\s]+)\[\]/', $docComment, $matches)) {
-             return true;
+        if (preg_match(ObjectProperties::PROPERTY_VAR_REGEX_NAME, $docComment, $matches)) {
+            return true;
         }
 
         return false;
     }
 
     /**
+     * @parm ReflectionProperty $property
      * @param array $propertyValue
-     * @param string $propertyName
      * @return string
      * @throws BadArgumentException
      * @throws ReflectionException
      */
-    private function serializeArrayObject(array $propertyValue, string $propertyName)
+    private function serializeArrayObject(ReflectionProperty $property, array $propertyValue)
     {
-        $xml = $this->getOpeningTag($this->getTagFromString($propertyName));
+        $propertyTag = $this->getTagNameByAnnotationIfExist($property);
+        $xml = $this->getOpeningTag($propertyTag);
         foreach ($propertyValue as $value) {
-            if(is_object($value)){
+            if (is_object($value)) {
                 $xml .= $this->serialise($value, false);
             }
         }
-        return $xml . $this->getClosingTag($this->getTagFromString($propertyName));
+        return $xml . $this->getClosingTag($propertyTag);
     }
 
     /**
@@ -208,22 +297,111 @@ class XmlSerializer implements Serialiser
      * @param $dto
      * @return bool
      */
-    private function isPropertyAnAttributes($propertyName, $dto)
+    private function isPropertyAnAttribute($reflectionProperty, $dto)
     {
-        $methodName = XmlProperties::XML_GETTER_ATTRIBUTES_NAME;
-        if (method_exists($dto, $methodName)) {
-            $arrayAttributes =  $dto->$methodName();
-            return in_array($propertyName, $arrayAttributes);
+        $docComment = $reflectionProperty->getDocComment();
+
+        if ($docComment) {
+            // Match the @tagName annotation using a regular expression
+            if (preg_match(XmlProperties::XML_ATTRIBUTE_ANNOTATION, $docComment, $matches)) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
         }
-        return false;
     }
 
     private function getOpeningTagWithAttributes($tag, string $attributes)
     {
-        $attributesString = $attributes ? " ". $attributes : "";
+        $attributesString = $attributes ? " " . $attributes : "";
         return XmlProperties::XML_OPENING_ARROW . $tag . $attributesString . XmlProperties::XML_CLOSING_ARROW;
     }
 
+    /**
+     * @param ReflectionProperty $reflectionProperty
+     * @return string
+     */
+    public function getTagNameByAnnotation($reflectionProperty)
+    {
+        $docComment = $reflectionProperty->getDocComment();
 
+        if ($docComment) {
+            // Match the @tagName annotation using a regular expression
+            if (preg_match(ObjectProperties::PROPERRTY_OUTPUT_REGEX_NAME, $docComment, $matches)) {
+                $tagValue = $matches[1];
+                return $tagValue;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    private function getTagNameByAnnotationIfExist(ReflectionProperty $property): string
+    {
+        $tagNameByAnnotation = $this->getTagNameByAnnotation($property);
+        if ($tagNameByAnnotation) {
+            $propertyTag = $tagNameByAnnotation;
+        } else {
+            $propertyTag = $this->getTagFromString($property->getName());
+        }
+        return $propertyTag;
+    }
+
+    private function getClassNameByInputAttributeIfExist(string $child, string $targetClass): string
+    {
+        $reflection = new ReflectionClass($targetClass);
+        $preperties = $reflection->getProperties(ReflectionProperty::IS_PRIVATE);
+        foreach ($preperties as $property) {
+            $docComment = $property->getDocComment();
+            if ($docComment) {
+                // Match the @tagName annotation using a regular expression
+                if (preg_match(ObjectProperties::PROPERRTY_INPUT_REGEX_NAME, $docComment, $matches)) {
+                    $tagValue = $matches[1];
+                    if ($tagValue == $child) {
+                        return $property->getName();
+                    }
+                }
+            }
+        }
+        return strtolower($child);
+    }
+
+
+    /**
+     *
+     * @param string $propertyName
+     * @param $targetClass
+     * @return false|string
+     * @throws ReflectionException
+     */
+    private function getClassNameByPropertyName(string $propertyName, string $targetClass)
+    {
+        $reflectionClass = new ReflectionClass($targetClass);
+        if (!$reflectionClass->hasProperty($propertyName)) {
+            throw new NotFoundException("Property $propertyName does not exist in $targetClass");
+        }
+        $property = $reflectionClass->getProperty($propertyName);
+        $docComment = $property->getDocComment();
+
+        // Check for the presence of the @var annotation
+        if (preg_match(ObjectProperties::PROPERTY_VAR_REGEX_NAME, $docComment, $matches)) {
+            $type = $matches[1];
+
+            // Check if the type is an object (not a scalar type like int, string, etc.)
+            if (!in_array(strtolower($type), ObjectProperties::SCALAR_VALUES)) {
+                return $type;
+            }
+        }
+        return false;
+    }
+
+    private function getSetterNameByPropertyName(string $propertyName)
+    {
+        return 'set' . ucfirst($propertyName);
+    }
 
 }

@@ -6,6 +6,6 @@ interface Serialiser
 {
     public function serialise($dto);
 
-    public function unserialise($string, $targetClass);
+    public function unserialise(string $string,string $targetClass);
 
 }

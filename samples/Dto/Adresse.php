@@ -1,10 +1,19 @@
 <?php
 
-namespace Samples;
+namespace Samples\Dto;
 
 class Adresse
 {
+
     /**
+     * @isAttribute
+     * @var string $id
+     */
+    private string $id;
+
+    /**
+     * @outputName adresse-city
+     * @inputName adresse-city
      * @var string $city
      */
     private $city;
@@ -24,6 +33,8 @@ class Adresse
      * @var string $city
      */
     private $zip;
+
+
 
     /**
      * @return mixed
@@ -87,6 +98,16 @@ class Adresse
     public function setZip($zip): void
     {
         $this->zip = $zip;
+    }
+
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function setId(string $id): void
+    {
+        $this->id = $id;
     }
 
 
