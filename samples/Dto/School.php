@@ -24,7 +24,7 @@ class School
 
     /**
      * @outputName school-rooms
-     * @inputName school-roomsH
+     * @inputName school-rooms
      * @var Room[] $rooms
      */
     private $rooms;

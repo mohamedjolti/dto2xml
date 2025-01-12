@@ -1,6 +1,6 @@
 {
     "name": "jolti/dtotoxml",
-    "description" : "A PHP library to convert objects to XML documents",
+    "description" : "A PHP library to serilize/unserilize objects with subtypes  to XML documents",
     "autoload": {
         "psr-4": {
             "Dtotoxml\\": "src/",
@@ -10,7 +10,7 @@
     },
     "authors": [
         {
-            "name": "mohamed jolti"
+            "name": "Mohamed JOLTI"
         }
     ],
     "require-dev": {
