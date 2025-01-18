@@ -40,8 +40,8 @@ composer require jolti/dto2xml
 Let’s begin by setting up the serializer with a custom configuration:
 
 ```php
-use YourVendor\XmlSerializer;
-use YourVendor\Configuration;
+use Dtotoxml\XmlSerializer;
+use Dtotoxml\Configuration;
 use Samples\Dto\School;
 use Samples\Dto\SchoolFixtures;
 
