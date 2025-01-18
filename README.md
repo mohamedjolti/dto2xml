@@ -3,7 +3,7 @@
 This package provides a simple and efficient way to serialize DTOs (Data Transfer Objects) with subtypes to XML and deserialize XML back to PHP objects.
 
 ## What is `dto2xml`?
-
+ 
 At its core, `dto2xml` is a PHP library that lets you:
 
 - Serialize objects (including those with subtypes) into well-structured XML documents.
