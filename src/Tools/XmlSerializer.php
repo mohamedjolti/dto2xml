@@ -21,11 +21,12 @@ class XmlSerializer implements Serialiser
 
     /**
      * @param $dto
+     * @param bool $isParent
      * @return string
      * @throws BadArgumentException
      * @throws ReflectionException
      */
-    public function serialise($dto, $isParent = true)
+    public function serialise(Object $dto,bool $isParent = true)
     {
         /* Verifiy that  the argument of type object */
         if (!is_object($dto)) {
@@ -81,7 +82,7 @@ class XmlSerializer implements Serialiser
         return $instance;
     }
 
-    private function xmlToArray(SimpleXMLElement $xml): array|string
+    public function xmlToArray(SimpleXMLElement $xml): array|string
     {
         $array = [];
 
@@ -114,7 +115,7 @@ class XmlSerializer implements Serialiser
     }
 
 
-    private function arrayToObject($array, $targetClass)
+    public function arrayToObject($array, $targetClass)
     {
         $instance = new $targetClass();
         foreach ($array as $key => $value) {
@@ -122,7 +123,7 @@ class XmlSerializer implements Serialiser
             /** List of attributes */
             if (XmlProperties::XML_ATTRIBUTE_UNSERIALIZE_KEY_NAME == $key) {
                 foreach ($value as $attribute => $attributeValue) {
-                    $attributePropertyName = $this->getClassNameByInputAttributeIfExist($attribute, $targetClass);
+                    $attributePropertyName = $this->getPropertyNameByInputAttributeIfExist($attribute, $targetClass);
                     $setterName = $this->getSetterNameByPropertyName($attributePropertyName);
                     if (!$setterName) {
                         throw new NotFoundException("The property '" . $attribute . "' does not exist or doesn't have a setter method");
@@ -131,7 +132,8 @@ class XmlSerializer implements Serialiser
                 }
                 continue;
             }
-            $propertyName = $this->getClassNameByInputAttributeIfExist($key, $targetClass);
+
+            $propertyName = $this->getPropertyNameByInputAttributeIfExist($key, $targetClass);
             $setterName = $this->getSetterNameByPropertyName($propertyName);
             /** If it is a sub type */
             if (is_array($value)) {
@@ -303,7 +305,7 @@ class XmlSerializer implements Serialiser
         }
     }
 
-    private function getOpeningTagWithAttributes($tag, string $attributes)
+    private function getOpeningTagWithAttributes(string $tag, string $attributes)
     {
         $attributesString = $attributes ? " " . $attributes : "";
         return XmlProperties::XML_OPENING_ARROW . $tag . $attributesString . XmlProperties::XML_CLOSING_ARROW;
@@ -313,7 +315,7 @@ class XmlSerializer implements Serialiser
      * @param ReflectionProperty $reflectionProperty
      * @return string
      */
-    public function getTagNameByAnnotation($reflectionProperty)
+    public function getTagNameByAnnotation(ReflectionProperty $reflectionProperty):string|bool
     {
         $docComment = $reflectionProperty->getDocComment();
 
@@ -341,7 +343,7 @@ class XmlSerializer implements Serialiser
         return $propertyTag;
     }
 
-    private function getClassNameByInputAttributeIfExist(string $child, string $targetClass): string
+    public function getPropertyNameByInputAttributeIfExist(string $child, string $targetClass): string
     {
         $reflection = new ReflectionClass($targetClass);
         $preperties = $reflection->getProperties(ReflectionProperty::IS_PRIVATE);
@@ -349,7 +351,7 @@ class XmlSerializer implements Serialiser
             $docComment = $property->getDocComment();
             if ($docComment) {
                 // Match the @tagName annotation using a regular expression
-                if (preg_match(ObjectProperties::PROPERRTY_INPUT_REGEX_NAME, $docComment, $matches)) {
+                if (preg_match(ObjectProperties::PROPERTY_INPUT_REGEX_NAME, $docComment, $matches)) {
                     $tagValue = $matches[1];
                     if ($tagValue == $child) {
                         return $property->getName();
@@ -368,7 +370,7 @@ class XmlSerializer implements Serialiser
      * @return false|string
      * @throws ReflectionException
      */
-    private function getClassNameByPropertyName(string $propertyName, string $targetClass)
+    public function getClassNameByPropertyName(string $propertyName, string $targetClass)
     {
         $reflectionClass = new ReflectionClass($targetClass);
         if (!$reflectionClass->hasProperty($propertyName)) {
@@ -389,7 +391,7 @@ class XmlSerializer implements Serialiser
         return false;
     }
 
-    private function getSetterNameByPropertyName(string $propertyName)
+    public function getSetterNameByPropertyName(string $propertyName):string
     {
         return 'set' . ucfirst($propertyName);
     }
