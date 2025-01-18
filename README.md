@@ -28,7 +28,7 @@ Here are some reasons to consider `dto2xml` for your next project:
 To get started with `dto2xml`, simply install it via Composer:
 
 ```bash
-composer require your-vendor/dto2xml
+composer require jolti/dto2xml
 ```
 
 ---
