@@ -1,6 +1,6 @@
 {
     "name": "jolti/dtotoxml",
-    "description" : "A PHP library to serilize/unserilize objects with subtypes  to XML documents",
+    "description" : "A PHP library for serializing and unserializing objects, including those with subtypes, into XML documents.",
     "autoload": {
         "psr-4": {
             "Dtotoxml\\": "src/",
