@@ -2,22 +2,42 @@
 
 This package provides a simple and efficient way to serialize DTOs (Data Transfer Objects) with subtypes to XML and deserialize XML back to PHP objects.
 
-## Features
-- Serialize complex PHP objects, including subtypes, into XML format.
-- Deserialize XML strings back into PHP objects.
-- Configurable XML headers and namespace output.
+## What is `dto2xml`?
+
+At its core, `dto2xml` is a PHP library that lets you:
+
+- Serialize objects (including those with subtypes) into well-structured XML documents.
+- Unserialize XML back into PHP objects effortlessly.
+
+The library is built with flexibility and ease of use in mind, making it ideal for both small-scale and enterprise-level applications.
+
+---
+
+## Why `dto2xml`?
+
+Here are some reasons to consider `dto2xml` for your next project:
+
+1. **Handles Subtypes Gracefully**: Many libraries struggle when dealing with objects containing subtypes or nested structures. `dto2xml` shines in this area.
+2. **Configurable Output**: You can customize XML headers, namespaces, and more to match your specific requirements.
+3. **Clean and Intuitive API**: With a few lines of code, you can transform objects into XML or parse XML back into objects.
+
+---
 
 ## Installation
 
-You can install the package via Composer:
+To get started with `dto2xml`, simply install it via Composer:
 
 ```bash
-composer require jolti/dtotoxml
+composer require your-vendor/dto2xml
 ```
 
-## Usage
+---
+
+## How to Use `dto2xml`
 
 ### Setting Up the Serializer
+
+Let’s begin by setting up the serializer with a custom configuration:
 
 ```php
 use YourVendor\XmlSerializer;
@@ -27,7 +47,7 @@ use Samples\Dto\SchoolFixtures;
 
 $xmlSerialize = new XmlSerializer();
 
-/** Configuration */
+// Configure the serializer
 $config = new Configuration();
 $config->setHead('<?xml version="1.0"?>');
 $config->setNameSpaceOutput("Samples\\Dto");
@@ -35,6 +55,8 @@ $xmlSerialize->setConfig($config);
 ```
 
 ### Serializing an Object to XML
+
+To serialize an object, such as a `School` object with nested attributes, follow this approach:
 
 ```php
 $school = SchoolFixtures::createSchool();
@@ -46,6 +68,8 @@ echo '<pre>', htmlentities($xml), '</pre>';
 
 ### Deserializing XML to an Object
 
+Converting XML back into a PHP object is just as easy:
+
 ```php
 $xmlString = SchoolFixtures::createSchoolXml();
 $object = $xmlSerialize->unserialise($xmlString, School::class);
@@ -54,35 +78,18 @@ $object = $xmlSerialize->unserialise($xmlString, School::class);
 var_dump($object);
 ```
 
-## Example DTO: School
+### Example DTO: School
 
-Below is an example of a DTO that can be serialized and deserialized using this package:
+Here’s a sample Data Transfer Object (DTO) for a school, complete with subtypes:
 
 ```php
 namespace Samples\Dto;
 
 class School
 {
-    /**
-     * @var string $name
-     */
     private $name;
-
-    /**
-     * @var Adresse $adresse
-     */
     private $adresse;
-
-    /**
-     * @var Teacher[] $teachers
-     */
     private $teachers;
-
-    /**
-     * @outputName school-rooms
-     * @inputName school-rooms
-     * @var Room[] $rooms
-     */
     private $rooms;
 
     public function getAttributes(): array
@@ -132,52 +139,114 @@ class School
 }
 ```
 
+---
+
+## Annotations for Serialization and Deserialization
+
+The `dto2xml` library uses annotations to guide the serialization and deserialization process, providing powerful customization options. Here are the key annotations:
+
+### **`@isAttribute`**
+- **Purpose**: Marks a property as an XML attribute instead of an XML element.
+- **Example**:
+  ```php
+  /**
+   * @isAttribute
+   * @var string $id
+   */
+  private string $id;
+  ```
+    - The `id` field will be serialized as an attribute of the parent XML element, not as a child element.
+    - **XML Example**:
+      ```xml
+      <Adresse id="100">
+          <!-- Other elements -->
+      </Adresse>
+      ```
+    - This is useful for compact XML representations where certain values are better represented as attributes.
+
+---
+
+### **`@outputName`**
+- **Purpose**: Specifies the name of the field when serializing the object into XML.
+- **Example**:
+  ```php
+  /**
+   * @outputName adresse-city
+   * @inputName adresse-city
+   * @var string $city
+   */
+  private $city;
+  ```
+    - The `city` property will appear as `<adresse-city>` in the XML output.
+    - **XML Example**:
+      ```xml
+      <Adresse>
+          <adresse-city>Tangier</adresse-city>
+      </Adresse>
+      ```
+    - This allows you to control the naming conventions in your XML output to match specific schemas or external requirements.
+
+---
+
+### **`@inputName`**
+- **Purpose**: Specifies the name of the field when deserializing XML back into a PHP object.
+- **Example**:
+  ```php
+  /**
+   * @outputName adresse-city
+   * @inputName adresse-city
+   * @var string $city
+   */
+  private $city;
+  ```
+    - During deserialization, the library will map the `<adresse-city>` XML element back to the `city` property in the `Adresse` object.
+    - **XML Example**:
+      ```xml
+      <Adresse>
+          <adresse-city>Tangier</adresse-city>
+      </Adresse>
+      ```
+    - This ensures that even if the XML uses custom or non-standard names, the library can correctly map them to the appropriate object properties.
+
+---
+
+### Practical Usage
+These annotations are critical for ensuring flexibility in how the `dto2xml` library handles XML. They allow you to:
+1. **Customize XML Output**:
+    - Use `@outputName` to control the tag names for fields, ensuring compatibility with external systems.
+2. **Handle Non-Standard XML Inputs**:
+    - Use `@inputName` to map non-standard XML names to your PHP properties.
+3. **Compact Representations**:
+    - Use `@isAttribute` to define compact XML structures by leveraging attributes instead of child elements.
+
+---
+
 ## Configuration Options
 
-The `Configuration` class allows you to customize the serialization process:
+The `Configuration` class allows you to customize the serialization process to fit your needs. For example:
 
-- `setHead(string $header)`: Set the XML header.
-- `setNameSpaceOutput(string $namespace)`: Define the namespace used in the output XML.
+- **XML Header**: Set a custom XML declaration using `$config->setHead()`.
+- **Namespace**: Define the namespace for your XML output with `$config->setNameSpaceOutput()`.
 
-## Testing
+---
 
-You can write unit tests to validate the serialization and deserialization processes:
+## Why Developers Love `dto2xml`
 
-```php
-use PHPUnit\Framework\TestCase;
-use YourVendor\XmlSerializer;
-use Samples\Dto\SchoolFixtures;
+1. **Ease of Use**: The library’s API is straightforward and developer-friendly.
+2. **Powerful Features**: It handles nested objects and subtypes with ease.
+3. **Customizability**: You can tweak the output XML to meet any specification.
 
-class XmlSerializerTest extends TestCase
-{
-    public function testSerialization()
-    {
-        $serializer = new XmlSerializer();
-        $school = SchoolFixtures::createSchool();
-        $xml = $serializer->serialise($school);
-        $this->assertNotEmpty($xml);
-    }
+---
 
-    public function testDeserialization()
-    {
-        $serializer = new XmlSerializer();
-        $xmlString = SchoolFixtures::createSchoolXml();
-        $object = $serializer->unserialise($xmlString, School::class);
-        $this->assertInstanceOf(School::class, $object);
-    }
-}
-```
+## Get Started Today!
 
-## Contributing
+Ready to simplify your XML serialization tasks? Download `dto2xml` today and experience its power firsthand.
 
-Contributions are welcome! Please submit issues and pull requests via GitHub.
+Feel free to contribute to the project, report issues, or suggest features. Let’s make XML handling in PHP simpler, together.
 
-## License
+---
 
-This project is licensed under the MIT License.
+## Stay Connected
 
-## Acknowledgments
-
-- Inspired by XML serialization needs in complex PHP applications.
-- Thanks to the contributors for making this package possible.
+Follow us for updates and tips on getting the most out of `dto2xml`. Happy coding!
 
